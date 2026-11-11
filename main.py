@@ -1,8 +1,18 @@
 import sqlite3
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware # ΝΕΑ ΕΙΣΑΓΩΓΗ
 from pydantic import BaseModel
 
 app = FastAPI()
+
+# Ρύθμιση CORS για να μπορεί το Front-end να μιλάει με το Backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Το "*" επιτρέπει συνδέσεις από οποιοδήποτε site
+    allow_credentials=True,
+    allow_methods=["*"], # Επιτρέπει όλες τις εντολές (GET, POST, PUT, DELETE)
+    allow_headers=["*"],
+)
 
 # 1. ΣΥΝΔΕΣΗ ΜΕ ΤΗ ΒΑΣΗ
 # Δημιουργεί ένα αρχείο 'shop.db' στον φάκελό σου. Αν υπάρχει ήδη, απλά το ανοίγει.
@@ -109,4 +119,30 @@ def get_users():
     rows = cursor.fetchall()
     db_users = [{"id": row[0], "username": row[1], "email": row[2]} for row in rows]
     return {"status": "success", "users": db_users}
+
+# --- ΔΙΑΓΡΑΦΗ ΧΡΗΣΤΗ (DELETE) ---
+@app.delete("/users/{user_id}")
+def delete_user(user_id: int):
+    cursor.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+    if cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Ο χρήστης δεν βρέθηκε!")
+    
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    return {"status": "success", "message": f"Ο χρήστης με ID {user_id} διαγράφηκε!"}
+
+# --- ΕΝΗΜΕΡΩΣΗ ΧΡΗΣΤΗ (PUT) ---
+@app.put("/users/{user_id}")
+def update_user(user_id: int, user: NewUser):
+    cursor.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+    if cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Ο χρήστης δεν βρέθηκε!")
+        
+    cursor.execute("""
+        UPDATE users 
+        SET username = ?, email = ? 
+        WHERE id = ?
+    """, (user.username, user.email, user_id))
+    conn.commit()
+    return {"status": "success", "message": f"Ο χρήστης με ID {user_id} ενημερώθηκε!"}
     
